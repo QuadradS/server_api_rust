@@ -19,29 +19,34 @@ fn view_rustaceans(id: i32) -> Value {
 }
 
 #[post("/rustacean", format = "json")]
-fn create_rustaceans() -> Value {
+fn create_rustaceans(_auth: BasicAuth) -> Value {
     json!({"id": 1, "name": "John Doe"})
 }
 
 #[put("/rustaceans", format = "json")]
-fn update_rustaceans() -> Value {
+fn update_rustaceans(_auth: BasicAuth) -> Value {
     json!({"id": 1, "name": "John Doe"})
 }
 
 
 #[delete("/rustaceans/<id>")]
-fn delete_rustacean(id: i32) -> status::NoContent {
+fn delete_rustacean(id: i32, _auth: BasicAuth) -> status::NoContent {
     status::NoContent
 }
 
 #[catch(404)]
 fn not_found() -> Value {
-    json!("Not found!")
+    json!("404 Not found!")
 }
 
 #[catch(401)]
 fn not_auth() -> Value {
-    json!("Not authorized")
+    json!("401 Not authorized!")
+}
+
+#[catch(403)]
+fn forbidden() -> Value {
+    json!("403 Forbidden!")
 }
 
 #[launch]
@@ -55,6 +60,7 @@ fn rocket() -> _ {
     ])
     .register("/", catchers![
         not_found,
-        not_auth
+        not_auth,
+        forbidden
     ])
 }
