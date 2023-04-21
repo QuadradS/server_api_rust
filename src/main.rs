@@ -7,10 +7,9 @@ mod schema;
 
 use auth::BasicAuth;
 use diesel::prelude::*;
-use diesel::sql_types::Json;
 use models::{CreateRustocean, Rustocean};
 use rocket::response::status;
-use rocket::serde::json::{json, Value, Json as my_json};
+use rocket::serde::json::{json, Value, Json};
 use rocket_sync_db_pools::database;
 use schema::rustoceans;
 
@@ -37,7 +36,7 @@ fn view_rustaceans(id: i32) -> Value {
 }
 
 #[post("/rustaceans", format = "json", data="<create_dto>")]
-async fn create_rustaceans(_auth: BasicAuth, db: DbCon, create_dto: my_json<CreateRustocean>) -> Value {
+async fn create_rustaceans(_auth: BasicAuth, db: DbCon, create_dto: Json<CreateRustocean>) -> Value {
     db.run(|c| {
         let result = diesel::insert_into(rustoceans::table)
             .values(create_dto.into_inner())
@@ -73,6 +72,16 @@ fn forbidden() -> Value {
     json!("403 Forbidden!")
 }
 
+#[catch(422)]
+fn wrong_params() -> Value {
+    json!("422 Wrong params")
+}
+
+#[catch(400)]
+fn bad_request() -> Value {
+    json!("400 Bad request")
+}
+
 #[launch]
 fn rocket() -> _ {
     rocket::build()
@@ -87,5 +96,5 @@ fn rocket() -> _ {
             ],
         )
         .attach(DbCon::fairing())
-        .register("/", catchers![not_found, not_auth, forbidden])
+        .register("/", catchers![not_found, not_auth, forbidden, wrong_params, bad_request])
 }
