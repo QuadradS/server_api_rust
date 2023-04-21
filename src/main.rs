@@ -9,7 +9,7 @@ use auth::BasicAuth;
 use diesel::prelude::*;
 use models::{CreateRustocean, Rustocean};
 use rocket::response::status;
-use rocket::serde::json::{json, Value, Json};
+use rocket::serde::json::{json, Json, Value};
 use rocket_sync_db_pools::database;
 use schema::rustoceans;
 
@@ -31,12 +31,24 @@ async fn get_rustaceans(_auth: BasicAuth, db: DbCon) -> Value {
 }
 
 #[get("/rustaceans/<id>")]
-fn view_rustaceans(id: i32) -> Value {
-    json!({"id": id, "name": "John Doe"})
+async fn view_rustaceans(id: i32, db: DbCon) -> Value {
+    db.run(move |c| {
+        let result = rustoceans::table
+            .find(id)
+            .get_result::<Rustocean>(c)
+            .expect("DB Error occurred");
+
+        json!(result)
+    })
+    .await
 }
 
-#[post("/rustaceans", format = "json", data="<create_dto>")]
-async fn create_rustaceans(_auth: BasicAuth, db: DbCon, create_dto: Json<CreateRustocean>) -> Value {
+#[post("/rustaceans", format = "json", data = "<create_dto>")]
+async fn create_rustaceans(
+    _auth: BasicAuth,
+    db: DbCon,
+    create_dto: Json<CreateRustocean>,
+) -> Value {
     db.run(|c| {
         let result = diesel::insert_into(rustoceans::table)
             .values(create_dto.into_inner())
@@ -44,7 +56,8 @@ async fn create_rustaceans(_auth: BasicAuth, db: DbCon, create_dto: Json<CreateR
             .expect("Error to add create_dto");
 
         json!(result)
-    }).await
+    })
+    .await
 }
 
 #[put("/rustaceans", format = "json")]
@@ -96,5 +109,8 @@ fn rocket() -> _ {
             ],
         )
         .attach(DbCon::fairing())
-        .register("/", catchers![not_found, not_auth, forbidden, wrong_params, bad_request])
+        .register(
+            "/",
+            catchers![not_found, not_auth, forbidden, wrong_params, bad_request],
+        )
 }
