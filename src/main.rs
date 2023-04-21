@@ -1,16 +1,34 @@
-#[macro_use] extern crate rocket;
+#[macro_use]
+extern crate rocket;
 
 mod auth;
-use auth::{BasicAuth};
+mod models;
+mod schema;
 
-use rocket::serde::json::{Value, json};
-use rocket::response::{status};
+use auth::BasicAuth;
+use diesel::prelude::*;
+use diesel::sql_types::Json;
+use models::{CreateRustocean, Rustocean};
+use rocket::response::status;
+use rocket::serde::json::{json, Value, Json as my_json};
+use rocket_sync_db_pools::database;
+use schema::rustoceans;
 
-
+#[database("sqlite")]
+struct DbCon(diesel::SqliteConnection);
 
 #[get("/rustaceans")]
-fn get_rustaceans(_auth: BasicAuth) -> Value {
-    json!([{"id": 1, "name": "John Doe"}, {"id": 2, "name":"Sasha Lee"}])
+async fn get_rustaceans(_auth: BasicAuth, db: DbCon) -> Value {
+    db.run(|c| {
+        let r = rustoceans::table
+            .order(rustoceans::id.desc())
+            .limit(100)
+            .load::<Rustocean>(c)
+            .expect("DB Error occurred");
+
+        json!(r)
+    })
+    .await
 }
 
 #[get("/rustaceans/<id>")]
@@ -18,16 +36,22 @@ fn view_rustaceans(id: i32) -> Value {
     json!({"id": id, "name": "John Doe"})
 }
 
-#[post("/rustacean", format = "json")]
-fn create_rustaceans(_auth: BasicAuth) -> Value {
-    json!({"id": 1, "name": "John Doe"})
+#[post("/rustaceans", format = "json", data="<create_dto>")]
+async fn create_rustaceans(_auth: BasicAuth, db: DbCon, create_dto: my_json<CreateRustocean>) -> Value {
+    db.run(|c| {
+        let result = diesel::insert_into(rustoceans::table)
+            .values(create_dto.into_inner())
+            .execute(c)
+            .expect("Error to add create_dto");
+
+        json!(result)
+    }).await
 }
 
 #[put("/rustaceans", format = "json")]
 fn update_rustaceans(_auth: BasicAuth) -> Value {
     json!({"id": 1, "name": "John Doe"})
 }
-
 
 #[delete("/rustaceans/<id>")]
 fn delete_rustacean(id: i32, _auth: BasicAuth) -> status::NoContent {
@@ -51,16 +75,17 @@ fn forbidden() -> Value {
 
 #[launch]
 fn rocket() -> _ {
-    rocket::build().mount("/", routes![
-        get_rustaceans,
-        view_rustaceans,
-        create_rustaceans,
-        update_rustaceans,
-        delete_rustacean
-    ])
-    .register("/", catchers![
-        not_found,
-        not_auth,
-        forbidden
-    ])
+    rocket::build()
+        .mount(
+            "/",
+            routes![
+                get_rustaceans,
+                view_rustaceans,
+                create_rustaceans,
+                update_rustaceans,
+                delete_rustacean
+            ],
+        )
+        .attach(DbCon::fairing())
+        .register("/", catchers![not_found, not_auth, forbidden])
 }
