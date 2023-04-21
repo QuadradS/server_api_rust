@@ -1,6 +1,8 @@
 # server_api_rust
 
-test rust project to understand how to create project with rocket
+Test project to understand the basics of how to work with Rocket Diesel
+
+Also implementation of a simple Authorization via base64 token
 
 # Routing
 - get /rustaceans get all rustaceans
